@@ -1,0 +1,26 @@
+{
+  "name": "bookstoredbterminal-f21-comp3005",
+  "version": "1.0.0",
+  "description": "Final project for COMP3005",
+  "main": "userInterface.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/willKip/BookstoreDBTerminal-F21-COMP3005.git"
+  },
+  "author": "William Lee 101181435",
+  "bugs": {
+    "url": "https://github.com/willKip/BookstoreDBTerminal-F21-COMP3005/issues"
+  },
+  "homepage": "https://github.com/willKip/BookstoreDBTerminal-F21-COMP3005#readme",
+  "dependencies": {
+    "faker": "^5.5.3",
+    "pg": "^8.7.1",
+    "pg-format": "^1.0.4",
+    "prompt-sync": "^4.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15",
+    "@types/faker": "^5.5.9"
+  }
+}

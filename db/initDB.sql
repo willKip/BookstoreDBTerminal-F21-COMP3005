@@ -1,10 +1,21 @@
+BEGIN;
+
+-- drop database schema to reset
+drop schema public cascade;
+create schema public;
+-- restore default permissions
+grant all on schema public to postgres;
+grant all on schema public to public;
+
+-- rebuild database schema
+
 create type order_status as enum ('preparing', 'delivering', 'shipped');
 
 create table postal_code_location
 (
     postal_code varchar(10) not null,
-    city        varchar(15),
-    province    varchar(15),
+    city        varchar(25),
+    province    varchar(25),
 
     primary key (postal_code)
 );
@@ -12,17 +23,17 @@ create table postal_code_location
 create table publisher_banking
 (
     ID      serial,
-    balance numeric(15,4) check (balance >= 0),
+    balance numeric(15, 4) check (balance >= 0),
     primary key (ID)
 );
 
 create table publisher_address
 (
     ID            serial,
-    postal_code   varchar(15) not null,
-    street_number varchar(15),
-    street_name   varchar(15),
-    apt_number    varchar(15),
+    postal_code   varchar(10) not null,
+    street_number varchar(25),
+    street_name   varchar(25),
+    apt_number    varchar(10),
 
     primary key (ID),
     foreign key (postal_code) references postal_code_location (postal_code)
@@ -32,20 +43,20 @@ create table publisher_address
 
 create table publisher_phone
 (
-    ID    serial,
-    sales integer not null,
+    ID           serial,
+    phone_number varchar(15),
     primary key (ID)
 );
 
 create table publisher
 (
-    ID         serial,
-    banking_id integer not null,
-    address_id integer not null,
-    phone_id   integer not null,
-    name       varchar(15),
+    publisher_id serial,
+    banking_id   integer not null,
+    address_id   integer not null,
+    phone_id     integer not null,
+    name         varchar(25),
 
-    primary key (ID),
+    primary key (publisher_id),
     foreign key (banking_id) references publisher_banking (ID)
         on delete no action,
     foreign key (address_id) references publisher_address (ID)
@@ -59,9 +70,9 @@ create table book
     book_id           serial,
     publisher_id      integer,
     isbn              varchar(15),
-    title             varchar(15) not null,
+    title             varchar(30) not null,
     pages             integer check (pages >= 0),
-    price             numeric(15,4) check (price >= 0),
+    price             numeric(15, 4) check (price >= 0),
     publisher_percent numeric(3, 2) default 0,
     stock             integer check (stock >= 0),
     primary key (book_id),
@@ -73,23 +84,22 @@ create table book
 create table author
 (
     ID    serial,
-    name  varchar(15) not null,
+    name  varchar(25) not null,
     sales integer check (sales >= 0),
     primary key (ID)
 );
 
 create table genre
 (
-    ID    serial,
     name  varchar(15) not null,
     sales integer check (sales >= 0),
-    primary key (ID)
+    primary key (name)
 );
 
 -- order is a reserved keyword; quote when using
 create table "order"
 (
-    order_num     serial,
+    order_num     integer not null,
     status        order_status,
     billing_info  varchar(30),
     shipping_info varchar(30),
@@ -97,35 +107,35 @@ create table "order"
     primary key (order_num)
 );
 
--- book participation is total: must have at least one author
+-- book participation is total: books must have at least one author
 create table book_author
 (
     book_id   integer not null,
-    author_id integer,
+    author_id integer not null,
     primary key (book_id, author_id),
     foreign key (book_id) references book
-        on delete no action,
+        on delete cascade,
     foreign key (author_id) references author (ID)
-        on delete set null
+        on delete cascade
 );
 
 -- book participation is total: must have at least one genre
 create table book_genre
 (
-    book_id  integer not null,
-    genre_id integer,
-    primary key (book_id, genre_id),
+    book_id    integer     not null,
+    genre_name varchar(15) not null,
+    primary key (book_id, genre_name),
     foreign key (book_id) references book
         on delete no action,
-    foreign key (genre_id) references genre (ID)
+    foreign key (genre_name) references genre (name)
         on delete set null
 );
-
 
 create table order_book
 (
     order_num integer,
     book_id   integer,
+    quantity integer check (quantity >= 0),
     primary key (order_num, book_id),
     foreign key (order_num) references "order" (order_num)
         on delete set null,
@@ -141,3 +151,5 @@ create table "user"
     is_owner boolean     not null,
     primary key (ID)
 );
+
+COMMIT;
