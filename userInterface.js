@@ -5,24 +5,27 @@ const format = require("pg-format");
 const prompt = require("prompt-sync")({sigint: true});
 
 let checkoutBasket = {};
+let loggedin = "none";
 
 init();
 
 function init() {
     console.log("\n=== Welcome to the LookInnaBook Bookstore User Terminal ===");
     // login().then((loginSuccess) => {
-    //     if (loginSuccess)
+    //     if (loginSuccess) {
+    //         loggedin = loginSuccess
     //         libraryLoop();
+    //     }
     // });
 
     libraryLoop();
 }
 
 function libraryLoop() {
-    printMenu().then();
+    mainMenu().then();
 }
 
-async function printMenu() {
+async function mainMenu() {
     let ongoing = true;
 
     while (ongoing) {
@@ -41,9 +44,16 @@ async function printMenu() {
             case "2":
                 await bookMenu();
                 break;
+            case "4":
+                break;
+            case "5":
+                await trackOrder();
+                break;
             case "0":
+                console.log("Exiting...")
                 ongoing = false;
                 db.end();
+                console.log(`Have a nice day, ${loggedin}.`)
                 break;
             default:
                 break;
@@ -52,7 +62,7 @@ async function printMenu() {
 }
 
 async function login() {
-    let loginSuccess = false;
+    let loggedinId = null;
 
     while (true) {
         console.log("\nLogin (enter an empty value at any time to abort)")
@@ -68,14 +78,14 @@ async function login() {
 
         if (userQuery.rows[0] && userQuery.rows[0]["is_owner"] === false) {
             console.log("Login Success! Loading Bookstore...");
-            loginSuccess = true;
+            loggedinId = userId;
             break;
         } else {
             console.log("Login Failed. Check ID/PW, and that the account is not an owner.")
         }
     }
 
-    return loginSuccess;
+    return loggedinId;
 }
 
 async function listBooks() {
@@ -129,6 +139,12 @@ async function bookMenu() {
     let targetId = prompt("Book ID? > ");
 
     let book = await getBookObject(targetId);
+
+    if (!book) {
+        console.log(`Book ID ${targetId} not found.`);
+        return;
+    }
+
     let ongoing = true;
 
     while (ongoing) {
@@ -199,10 +215,8 @@ async function getBookObject(targetId) {
         .query(format("SELECT * FROM book WHERE book_id = %L", targetId))
         .catch(console.log);
 
-    if (bookQuery.rows.length === 0) {
-        console.log(`Book ID ${targetId} not found.`);
-        return;
-    }
+    if (bookQuery.rows.length === 0)
+        return null;
 
     const authorQuery = await db.query({
         text: format(
@@ -245,4 +259,62 @@ async function getBookObject(targetId) {
         isbn: bookQuery.rows[0]["isbn"],
         stock: Number(bookQuery.rows[0]["stock"])
     };
+}
+
+async function trackOrder() {
+    let targetOrder = prompt("Order Number? > ");
+    const orderQuery = await db
+        .query(format(
+            `SELECT * FROM "order" WHERE order_num = %L`, targetOrder))
+        .catch(console.log);
+
+    if (orderQuery.rows.length === 0) {
+        console.log(`Order ${targetOrder} not found.`);
+        return;
+    }
+
+    const orderBooks = await db
+        .query(format(
+            `SELECT * FROM order_book NATURAL JOIN book WHERE order_book.order_num = %L`, targetOrder))
+        .catch(console.log);
+
+    const orderObj = {
+        orderNum: orderQuery.rows[0]["order_num"],
+        status: orderQuery.rows[0]["status"],
+        billingInfo: orderQuery.rows[0]["billing_info"],
+        shippingInfo: orderQuery.rows[0]["shipping_info"],
+        books: []
+    };
+
+    for (const book of orderBooks.rows) {
+        orderObj.books.push({
+            bookId: book["book_id"],
+            title: book["title"],
+            quantity: book["quantity"],
+            price: book["price"]
+        });
+    }
+
+    console.log(`\n=== Displaying Order ${orderObj.orderNum} ===`);
+    console.log(`Status: ${orderObj.status}`);
+    console.log(`Billing Info: ${orderObj.billingInfo}`);
+    console.log(`Shipping Info: ${orderObj.shippingInfo}`);
+
+    // Round monetary values, using only necessary decimals
+
+    let total = 0;
+    console.log("Books:");
+    for (const book of orderObj.books) {
+        console.log(`   ID ${book.bookId} - ${book.title}`);
+        console.log(`   $${formatMoney(book.price)} - ${book.quantity} copies`);
+        total += book.price * book.quantity;
+    }
+
+    console.log("---");
+    console.log(`Total: $${formatMoney(total)}`);
+}
+
+// Rounds input to rounded string, to max 2 decimal places. Used for money outputs
+function formatMoney(input) {
+    return +parseFloat(input).toFixed(2);
 }
