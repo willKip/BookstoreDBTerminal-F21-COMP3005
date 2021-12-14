@@ -39,15 +39,18 @@ async function mainMenu() {
 
         switch (prompt("Selection > ")) {
             case "1":
-                await listBooks();
+                await listBooks().catch(console.log);
                 break;
             case "2":
-                await bookMenu();
+                await bookMenu().catch(console.log);
+                break;
+            case "3":
+                await searchBooks().catch(console.log);
                 break;
             case "4":
                 break;
             case "5":
-                await trackOrder();
+                await trackOrder().catch(console.log);
                 break;
             case "0":
                 console.log("Exiting...")
@@ -88,10 +91,18 @@ async function login() {
     return loggedinId;
 }
 
-async function listBooks() {
+async function listBooks(bookIds = []) {
+    let queryText = "SELECT * FROM book";
+
+    if (bookIds.length > 0)
+        queryText += format(" WHERE cast (book_id as text) IN (%L)", bookIds.flat());
+
+    queryText += " ORDER BY book_id";
+
     const bookQuery = await db
-        .query("SELECT * FROM book")
+        .query(queryText)
         .catch(console.log);
+
 
     console.log("\nDisplaying books.")
     console.log("ID; Title; Authors; Genres; Publisher; Pages; ISBN; Stock")
@@ -99,44 +110,22 @@ async function listBooks() {
     for (const book of bookQuery.rows) {
         let bookInfo = await getBookObject(book["book_id"])
         let bookString = "";
-
-        // ID
-        bookString += String(bookInfo.id).padStart(2, " ");
-
-        // Title
-        bookString += `; `;
-        bookString += String(bookInfo.title).padEnd(30, " ");
-
-        // Name(s) of book author(s)
-        bookString += `; `;
-        bookString += bookInfo.authors.join(", ").padEnd(20, " ");
-
-        // Name(s) of book genre(s)
-        bookString += `; `;
-        bookString += bookInfo.genres.join(", ").padEnd(15, " ");
-
-        // Name of publisher
-        bookString += `; `;
-        bookString += String(bookInfo.publisher).padEnd(26, " ");
-
-        // Pages
-        bookString += "; "
-        bookString += String(bookInfo.pages).padStart(5, " ");
-
-        // ISBN
-        bookString += "; "
-        bookString += String(bookInfo.isbn).padStart(10, " ");
-
-        // Stock
-        bookString += "; "
-        bookString += `${bookInfo.stock} left`;
+        bookString += String(bookInfo.id).padStart(2, " "); // ID
+        bookString += "; " + `${bookInfo.title}`.padEnd(30, " "); // Title
+        bookString += "; " + bookInfo.authors.join(", ").padEnd(20, " "); // Name(s) of book author(s)
+        bookString += "; " + bookInfo.genres.join(", ").padEnd(15, " "); // Name(s) of book genre(s)
+        bookString += "; " + `${bookInfo.publisher}`.padEnd(26, " "); // Publisher
+        bookString += ";" + `${bookInfo.pages}`.padStart(5, " "); // Pages
+        bookString += ";" + `${bookInfo.isbn}`.padStart(10, " "); // ISBN
+        bookString += `; ${bookInfo.stock} left`; // Stock
 
         console.log(bookString);  // Print book information string
     }
 }
 
 async function bookMenu() {
-    let targetId = prompt("Book ID? > ");
+    let targetId = getInteger("Book ID? > ");
+    if (!targetId) return;
 
     let book = await getBookObject(targetId);
 
@@ -166,12 +155,10 @@ async function bookMenu() {
                 console.log(`In Stock: ${book.stock} Copies`);
                 break;
             case "2":
-                let checkoutCount;
-                do {
-                    checkoutCount = prompt("How many copies? > ");
-                } while (isNaN(checkoutCount) || !Number.isInteger(Number(checkoutCount)))
+                let checkoutCount = getInteger("How many copies? > ");
 
-                checkoutCount = Number(checkoutCount);
+                if (!checkoutCount) // Abort if empty or 0 entered
+                    break;
 
                 let newStock = book.stock - checkoutCount;
                 if (newStock < 0) {
@@ -226,7 +213,7 @@ async function getBookObject(targetId) {
                 WHERE book_id = %L`,
             targetId),
         rowMode: "array"
-    });
+    }).catch(console.log);
 
     const genreQuery = await db.query({
         text: format(
@@ -236,7 +223,7 @@ async function getBookObject(targetId) {
                 WHERE book.book_id = %L`,
             targetId),
         rowMode: "array"
-    });
+    }).catch(console.log);
 
     const publisherQuery = await db.query({
         text: format(
@@ -246,7 +233,7 @@ async function getBookObject(targetId) {
                     WHERE book.book_id = %L`,
             targetId),
         rowMode: "array"
-    });
+    }).catch(console.log);
 
     return {
         id: targetId,
@@ -312,6 +299,87 @@ async function trackOrder() {
 
     console.log("---");
     console.log(`Total: $${formatMoney(total)}`);
+}
+
+async function searchBooks() {
+    let queryStr = "SELECT DISTINCT book_id FROM book";
+    let conditionArray = [];
+
+    console.log("\nEnter search parameters. Leave blank to skip. Text is not case-sensitive.");
+    console.log("( Title | ISBN | Min/Max Page | Min/Max Price | Author | Genre )");
+
+    let title = prompt("Title > ");
+    let isbn = prompt("ISBN (full or partial) > ");
+    let pageMin = getInteger("Min Pages > ");
+    let pageMax = getInteger("Max Pages > ");
+    let priceMin = getInteger("Min Price > ");
+    let priceMax = getInteger("Max Price > ");
+
+    if (title) conditionArray.push(format("title ILIKE %L", `%${title}%`));
+    if (isbn) conditionArray.push(format("isbn ILIKE %L", `%${isbn}%`));
+    if (pageMin) conditionArray.push(format("pages >= %L", pageMin));
+    if (pageMax) conditionArray.push(format("pages <= %L", pageMax));
+    if (priceMin) conditionArray.push(format("price >= %L", priceMin));
+    if (priceMax) conditionArray.push(format("price <= %L", priceMax));
+
+    if (conditionArray.length !== 0)
+        queryStr += " WHERE " + conditionArray.join(" AND ");
+
+    // Search in books only to lessen load on join with genre and author tables
+    const initialQuery = await db
+        .query({
+            text: queryStr,
+            rowMode: "array"
+        })
+        .catch(console.log);
+
+    // Author
+    let author = prompt("Author Name > ");
+
+    let authorQueryStr = format(
+        `SELECT DISTINCT book_id
+            FROM (book_author JOIN author ON book_author.author_id = author.id) 
+            WHERE author.name ILIKE %L`, `%${author}%`);
+
+    if (initialQuery.rows.length > 0)
+        authorQueryStr += format("AND cast (book_id as text) IN (%L)", initialQuery.rows.flat())
+
+    const authorQuery = await db
+        .query({
+            text: authorQueryStr,
+            rowMode: "array"
+        })
+        .catch(console.log);
+
+    // Genre
+    let genre = prompt("Genre Name > ");
+
+    let genreQueryStr = format(
+        `SELECT DISTINCT book_id
+            FROM book_genre 
+            WHERE genre_name ILIKE %L`, `%${genre}%`);
+
+    if (authorQuery.rows.length > 0)
+        genreQueryStr += format("AND cast (book_id as text) IN (%L)", authorQuery.rows.flat())
+
+    const genreQuery = await db
+        .query({
+            text: genreQueryStr,
+            rowMode: "array"
+        })
+        .catch(console.log);
+
+    await listBooks(genreQuery.rows);
+}
+
+// Prompts user repeatedly to obtain a valid integer input or an empty (falsy) input
+function getInteger(ask) {
+    let result;
+    do {
+        result = prompt(ask);
+    } while (isNaN(result) || !Number.isInteger(Number(result)))
+
+    return Number(result);
 }
 
 // Rounds input to rounded string, to max 2 decimal places. Used for money outputs
