@@ -85,7 +85,7 @@ async function initPublisherAddress(count = 15) {
         // Select postal code from existing, randomly
 
         let zipCode = postalCodes.rows[faker.datatype.number(postalCodes.rows.length-1)];
-        let streetNum = faker.address.city();
+        let streetNum = faker.datatype.number({min: 101, max: 999});
         let streetName = faker.address.streetName();
         let aptNum = faker.datatype.number({min: 101, max: 999});
 
@@ -173,17 +173,15 @@ async function initOrder(count = 2) {
 
     for (let i = 0; i < count; i++) {
         // Select order status from enum, randomly
-
-        let orderNum = 10000 + i;
         let orderStatus = orderStatusArray[faker.datatype.number(orderStatusArray.length-1)];
         let billingInfo = `${faker.address.city()}, ${faker.address.state()}`.substring(0, 30);
         let shippingInfo = `${faker.address.city()}, ${faker.address.state()}`.substring(0, 30);
 
-        values.push([orderNum, orderStatus, billingInfo, shippingInfo]);
+        values.push([orderStatus, billingInfo, shippingInfo]);
     }
 
     return db
-        .query(format('INSERT INTO "order"(order_num, status, billing_info, shipping_info) VALUES %L RETURNING *',
+        .query(format('INSERT INTO "order"(status, billing_info, shipping_info) VALUES %L RETURNING *',
             values), [])
         .then((res) => console.log(`[${res.rows.length}] order entries initialized.`))
         .catch(console.log);

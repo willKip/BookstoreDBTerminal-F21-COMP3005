@@ -2,6 +2,7 @@
 
 const db = require("./db/index");
 const format = require("pg-format");
+const {getBookObject, listBooks, getInteger} = require("./db");
 const prompt = require("prompt-sync")({sigint: true});
 
 let checkoutBasket = {};
@@ -11,14 +12,12 @@ init();
 
 function init() {
     console.log("\n=== Welcome to the LookInnaBook Bookstore User Terminal ===");
-    // login().then((loginSuccess) => {
-    //     if (loginSuccess) {
-    //         loggedin = loginSuccess
-    //         libraryLoop();
-    //     }
-    // });
-
-    libraryLoop();
+    login().then((loginSuccess) => {
+        if (loginSuccess) {
+            loggedin = loginSuccess
+            libraryLoop();
+        }
+    });
 }
 
 function libraryLoop() {
@@ -48,6 +47,7 @@ async function mainMenu() {
                 await searchBooks().catch(console.log);
                 break;
             case "4":
+                await checkOutMenu().catch(console.log);
                 break;
             case "5":
                 await trackOrder().catch(console.log);
@@ -76,7 +76,7 @@ async function login() {
 
         const userQuery = await db
             .query(format('SELECT is_owner FROM "user" WHERE id = %L AND password = %L',
-                userId, userPw), [])
+                userId, userPw))
             .catch(console.log);
 
         if (userQuery.rows[0] && userQuery.rows[0]["is_owner"] === false) {
@@ -89,38 +89,6 @@ async function login() {
     }
 
     return loggedinId;
-}
-
-async function listBooks(bookIds = []) {
-    let queryText = "SELECT * FROM book";
-
-    if (bookIds.length > 0)
-        queryText += format(" WHERE cast (book_id as text) IN (%L)", bookIds.flat());
-
-    queryText += " ORDER BY book_id";
-
-    const bookQuery = await db
-        .query(queryText)
-        .catch(console.log);
-
-
-    console.log("\nDisplaying books.")
-    console.log("ID; Title; Authors; Genres; Publisher; Pages; ISBN; Stock")
-
-    for (const book of bookQuery.rows) {
-        let bookInfo = await getBookObject(book["book_id"])
-        let bookString = "";
-        bookString += String(bookInfo.id).padStart(2, " "); // ID
-        bookString += "; " + `${bookInfo.title}`.padEnd(30, " "); // Title
-        bookString += "; " + bookInfo.authors.join(", ").padEnd(20, " "); // Name(s) of book author(s)
-        bookString += "; " + bookInfo.genres.join(", ").padEnd(15, " "); // Name(s) of book genre(s)
-        bookString += "; " + `${bookInfo.publisher}`.padEnd(26, " "); // Publisher
-        bookString += ";" + `${bookInfo.pages}`.padStart(5, " "); // Pages
-        bookString += ";" + `${bookInfo.isbn}`.padStart(10, " "); // ISBN
-        bookString += `; ${bookInfo.stock} left`; // Stock
-
-        console.log(bookString);  // Print book information string
-    }
 }
 
 async function bookMenu() {
@@ -141,7 +109,7 @@ async function bookMenu() {
         console.log("Options:");
         console.log("   (1) View Book Info");
         console.log("   (2) Add To Checkout");
-        console.log("   (0) Back to Menu");
+        console.log("   (0) Back to Main Menu");
 
         switch (prompt("Selection > ")) {
             case "1":
@@ -155,36 +123,14 @@ async function bookMenu() {
                 console.log(`In Stock: ${book.stock} Copies`);
                 break;
             case "2":
-                let checkoutCount = getInteger("How many copies? > ");
+                let buyCount = getInteger("How many copies? > ");
 
-                if (!checkoutCount) // Abort if empty or 0 entered
-                    break;
-
-                let newStock = book.stock - checkoutCount;
-                if (newStock < 0) {
-                    newStock = 0;
-                    checkoutCount = book.stock;
-                    console.log(`Too many copies requested: only ordering ${checkoutCount}`);
+                if (buyCount) {
+                    if (book.id in checkoutBasket)
+                        checkoutBasket[book.id] += buyCount;
+                    else
+                        checkoutBasket[book.id] = buyCount;
                 }
-
-                await db.query({
-                    text: format(
-                        `UPDATE book 
-                        SET stock = %L
-                        WHERE book_id = %L`,
-                        newStock, book.id)
-                });
-
-                // TODO: move this out to actual ordering
-
-                if (book.id in checkoutBasket)
-                    checkoutBasket[book.id] += checkoutCount;
-                else
-                    checkoutBasket[book.id] = checkoutCount;
-
-                // Update book object to reflect stock change
-                book = await getBookObject(targetId);
-
                 break;
             case "0":
                 ongoing = false;
@@ -195,57 +141,121 @@ async function bookMenu() {
     }
 }
 
-// Generates object containing all directly relevant properties of the book with targetId.
-// {id, title, authors, genres, publisher, pages, price, isbn, stock}
-async function getBookObject(targetId) {
-    const bookQuery = await db
-        .query(format("SELECT * FROM book WHERE book_id = %L", targetId))
-        .catch(console.log);
+async function checkOutMenu() {
+    console.log(`\n=== Printing checkout basket of user ${loggedin} ===`);
 
-    if (bookQuery.rows.length === 0)
-        return null;
+    let bookObjs = [];
+    let total = 0;
+    for (let i = 0; i < Object.keys(checkoutBasket).length; i++) {
+        const bookId = Object.keys(checkoutBasket)[i];
 
-    const authorQuery = await db.query({
-        text: format(
-            `SELECT author.name 
-                FROM book_author JOIN author 
-                ON book_author.author_id = author.id
-                WHERE book_id = %L`,
-            targetId),
-        rowMode: "array"
-    }).catch(console.log);
+        bookObjs.push(await getBookObject(bookId));
+        console.log(`   ID ${bookObjs[i].id} - ${bookObjs[i].title}`);
+        console.log(`   $${formatMoney(bookObjs[i].price)} - ${checkoutBasket[bookId]} copies`);
+        total += bookObjs[i].price * checkoutBasket[bookId];
+    }
+    console.log(`Total: $${formatMoney(total)}`);
 
-    const genreQuery = await db.query({
-        text: format(
-            `SELECT book_genre.genre_name 
-                FROM book JOIN book_genre 
-                ON book.book_id = book_genre.book_id 
-                WHERE book.book_id = %L`,
-            targetId),
-        rowMode: "array"
-    }).catch(console.log);
+    let ongoing = true;
 
-    const publisherQuery = await db.query({
-        text: format(
-            `SELECT publisher.name
-                    FROM book JOIN publisher
-                    ON book.publisher_id = publisher.publisher_id
-                    WHERE book.book_id = %L`,
-            targetId),
-        rowMode: "array"
-    }).catch(console.log);
+    while (ongoing) {
+        console.log("\nOptions:");
+        console.log("   (1) Checkout items in basket");
+        console.log("   (0) Back to Main Menu");
 
-    return {
-        id: targetId,
-        title: bookQuery.rows[0]["title"],
-        authors: authorQuery.rows.flat(),
-        genres: genreQuery.rows.flat(),
-        publisher: publisherQuery.rows[0],
-        pages: Number(bookQuery.rows[0]["pages"]),
-        price: Number(bookQuery.rows[0]["price"]),
-        isbn: bookQuery.rows[0]["isbn"],
-        stock: Number(bookQuery.rows[0]["stock"])
-    };
+        switch (prompt("Selection > ")) {
+            case "1":
+                if (Object.keys(checkoutBasket).length > 0) {
+                    // Retrieve enum values of order_status enum
+                    const orderStatuses = await db.query({
+                        rowMode: "array", text: "SELECT to_json (enum_range(null::order_status))"
+                    });
+
+                    let orderStatusArray = orderStatuses.rows[0][0];
+                    let billing = prompt("Enter billing info > ");
+                    let shipping = prompt("Enter shipping info > ");
+
+                    const newOrderNum = await db.query({
+                        text: format(
+                            'INSERT INTO "order"(status, billing_info, shipping_info) VALUES (%L) RETURNING order_num',
+                            [orderStatusArray[Math.floor(Math.random() * orderStatusArray.length)],
+                                billing,
+                                shipping]),
+                        rowMode: "array"
+                    })
+                        .catch(console.log);
+
+                    for (const book of bookObjs) {
+                        let newStock = book.stock - checkoutBasket[book.id];
+                        if (newStock < 0) {
+                            newStock = 0;
+                            console.log(
+                                `Too many copies requested: only ordering ${book.stock} of ${book.title}`
+                            );
+                        }
+                        let soldCount = book.stock - newStock;
+
+                        await db.query({
+                            text: format(
+                                `UPDATE book SET stock = %L WHERE book_id = %L`,
+                                newStock, book.id)
+                        }).catch(console.log);
+
+                        await db.query(format(
+                            "INSERT INTO order_book(order_num, book_id, quantity) VALUES (%L)",
+                                [newOrderNum.rows[0], book.id, soldCount]
+                        )).catch(console.log);
+
+                        // Update appropriate statistics and credits money to publisher
+
+                        // Author sales
+                        await db.query(format(
+                            "UPDATE author SET sales = sales + %L WHERE id IN (" +
+                            "SELECT author_id " +
+                            "FROM book JOIN book_author ON book.book_id = book_author.book_id " +
+                            "WHERE book.book_id = %L)",
+                            soldCount, book.id
+                        )).catch(console.log);
+
+                        // Genre sales
+                        await db.query(format(
+                            "UPDATE genre SET sales = sales + %L WHERE name IN (" +
+                            "SELECT genre_name " +
+                            "FROM book JOIN book_genre ON book.book_id = book_genre.book_id " +
+                            "WHERE book.book_id = %L)",
+                            soldCount, book.id
+                        )).catch(console.log);
+
+                        // Publisher payment
+                        await db.query(format(
+                            "UPDATE publisher_banking " +
+                            "SET balance = balance + %L * bookInfo.price * bookInfo.publisher_percent " +
+                            "FROM ( " +
+                            "    SELECT price, publisher_percent " +
+                            "    FROM book " +
+                            "    WHERE book_id = %L) as bookInfo " +
+                            "WHERE id = ( " +
+                            "    SELECT banking_id " +
+                            "    FROM book JOIN publisher ON book.publisher_id = publisher.publisher_id " +
+                            "    WHERE book_id = %L)",
+                            soldCount, book.id, book.id
+                        )).catch(console.log);
+                    }
+
+                    checkoutBasket = {};
+                    ongoing = false;
+                    console.log(`Checked out. Order number is ${newOrderNum.rows[0]}.`);
+                } else {
+                    console.log("Checkout basket is empty.");
+                }
+                break;
+            case "0":
+                ongoing = false;
+                break;
+            default:
+                break;
+        }
+    }
 }
 
 async function trackOrder() {
@@ -286,8 +296,6 @@ async function trackOrder() {
     console.log(`Status: ${orderObj.status}`);
     console.log(`Billing Info: ${orderObj.billingInfo}`);
     console.log(`Shipping Info: ${orderObj.shippingInfo}`);
-
-    // Round monetary values, using only necessary decimals
 
     let total = 0;
     console.log("Books:");
@@ -333,16 +341,19 @@ async function searchBooks() {
         })
         .catch(console.log);
 
+    if (initialQuery.rows.length === 0) {
+        console.log("No matches found.")
+        return;
+    }
+
     // Author
     let author = prompt("Author Name > ");
 
     let authorQueryStr = format(
         `SELECT DISTINCT book_id
             FROM (book_author JOIN author ON book_author.author_id = author.id) 
-            WHERE author.name ILIKE %L`, `%${author}%`);
-
-    if (initialQuery.rows.length > 0)
-        authorQueryStr += format("AND cast (book_id as text) IN (%L)", initialQuery.rows.flat())
+            WHERE author.name ILIKE %L
+            AND cast (book_id as text) IN (%L)`, `%${author}%`, initialQuery.rows.flat());
 
     const authorQuery = await db
         .query({
@@ -351,16 +362,19 @@ async function searchBooks() {
         })
         .catch(console.log);
 
+    if (authorQuery.rows.length === 0) {
+        console.log("No matches found.")
+        return;
+    }
+
     // Genre
     let genre = prompt("Genre Name > ");
 
     let genreQueryStr = format(
         `SELECT DISTINCT book_id
             FROM book_genre 
-            WHERE genre_name ILIKE %L`, `%${genre}%`);
-
-    if (authorQuery.rows.length > 0)
-        genreQueryStr += format("AND cast (book_id as text) IN (%L)", authorQuery.rows.flat())
+            WHERE genre_name ILIKE %L
+            AND cast (book_id as text) IN (%L)`, `%${genre}%`, authorQuery.rows.flat());
 
     const genreQuery = await db
         .query({
@@ -369,18 +383,14 @@ async function searchBooks() {
         })
         .catch(console.log);
 
+    if (genreQuery.rows.length === 0) {
+        console.log("No matches found.")
+        return;
+    }
+
     await listBooks(genreQuery.rows);
 }
 
-// Prompts user repeatedly to obtain a valid integer input or an empty (falsy) input
-function getInteger(ask) {
-    let result;
-    do {
-        result = prompt(ask);
-    } while (isNaN(result) || !Number.isInteger(Number(result)))
-
-    return Number(result);
-}
 
 // Rounds input to rounded string, to max 2 decimal places. Used for money outputs
 function formatMoney(input) {

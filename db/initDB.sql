@@ -1,155 +1,174 @@
 BEGIN;
 
 -- drop database schema to reset
-drop schema public cascade;
-create schema public;
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
 -- restore default permissions
-grant all on schema public to postgres;
-grant all on schema public to public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO PUBLIC;
 
 -- rebuild database schema
 
-create type order_status as enum ('preparing', 'delivering', 'shipped');
+CREATE TYPE order_status AS ENUM ('preparing', 'delivering', 'shipped');
 
-create table postal_code_location
+CREATE TABLE postal_code_location
 (
-    postal_code varchar(10) not null,
-    city        varchar(25),
-    province    varchar(25),
+    postal_code VARCHAR(10) NOT NULL,
+    city        VARCHAR(25),
+    province    VARCHAR(25),
 
-    primary key (postal_code)
+    PRIMARY KEY (postal_code)
 );
 
-create table publisher_banking
+CREATE TABLE publisher_banking
 (
-    ID      serial,
-    balance numeric(15, 4) check (balance >= 0),
-    primary key (ID)
+    id      SERIAL,
+    balance NUMERIC(15, 4) CHECK (balance >= 0),
+    PRIMARY KEY (id)
 );
 
-create table publisher_address
+CREATE TABLE publisher_address
 (
-    ID            serial,
-    postal_code   varchar(10) not null,
-    street_number varchar(25),
-    street_name   varchar(25),
-    apt_number    varchar(10),
+    id            SERIAL,
+    postal_code   VARCHAR(10) NOT NULL,
+    street_number VARCHAR(25),
+    street_name   VARCHAR(25),
+    apt_number    VARCHAR(10),
 
-    primary key (ID),
-    foreign key (postal_code) references postal_code_location (postal_code)
-        on delete no action
+    PRIMARY KEY (id),
+    FOREIGN KEY (postal_code) REFERENCES postal_code_location (postal_code)
+        ON DELETE NO ACTION
 );
 
 
-create table publisher_phone
+CREATE TABLE publisher_phone
 (
-    ID           serial,
-    phone_number varchar(15),
-    primary key (ID)
+    id           SERIAL,
+    phone_number VARCHAR(15),
+    PRIMARY KEY (id)
 );
 
-create table publisher
+CREATE TABLE publisher
 (
-    publisher_id serial,
-    banking_id   integer not null,
-    address_id   integer not null,
-    phone_id     integer not null,
-    name         varchar(25),
+    publisher_id SERIAL,
+    banking_id   INTEGER NOT NULL,
+    address_id   INTEGER NOT NULL,
+    phone_id     INTEGER NOT NULL,
+    name         VARCHAR(25),
 
-    primary key (publisher_id),
-    foreign key (banking_id) references publisher_banking (ID)
-        on delete no action,
-    foreign key (address_id) references publisher_address (ID)
-        on delete no action,
-    foreign key (phone_id) references publisher_phone (ID)
-        on delete no action
+    PRIMARY KEY (publisher_id),
+    FOREIGN KEY (banking_id) REFERENCES publisher_banking (id)
+        ON DELETE NO ACTION,
+    FOREIGN KEY (address_id) REFERENCES publisher_address (id)
+        ON DELETE NO ACTION,
+    FOREIGN KEY (phone_id) REFERENCES publisher_phone (id)
+        ON DELETE NO ACTION
 );
 
-create table book
+CREATE TABLE book
 (
-    book_id           serial,
-    publisher_id      integer,
-    isbn              varchar(15),
-    title             varchar(30) not null,
-    pages             integer check (pages >= 0),
-    price             numeric(15, 4) check (price >= 0),
-    publisher_percent numeric(3, 2) default 0,
-    stock             integer check (stock >= 0),
-    primary key (book_id),
+    book_id           SERIAL,
+    publisher_id      INTEGER NOT NULL,
+    isbn              VARCHAR(15),
+    title             VARCHAR(30) NOT NULL,
+    pages             INTEGER CHECK (pages >= 0),
+    price             NUMERIC(15, 4) CHECK (price >= 0),
+    publisher_percent NUMERIC(3, 2) DEFAULT 0,
+    stock             INTEGER CHECK (stock >= 0),
+    PRIMARY KEY (book_id),
 
-    foreign key (publisher_id) references publisher
-        on delete set null
+    FOREIGN KEY (publisher_id) REFERENCES publisher
+        ON DELETE SET NULL
 );
 
-create table author
+CREATE TABLE author
 (
-    ID    serial,
-    name  varchar(25) not null,
-    sales integer check (sales >= 0),
-    primary key (ID)
+    id    SERIAL,
+    name  VARCHAR(25) NOT NULL,
+    sales INTEGER CHECK (sales >= 0),
+    PRIMARY KEY (id)
 );
 
-create table genre
+CREATE TABLE genre
 (
-    name  varchar(15) not null,
-    sales integer check (sales >= 0),
-    primary key (name)
+    name  VARCHAR(15) NOT NULL,
+    sales INTEGER CHECK (sales >= 0),
+    PRIMARY KEY (name)
 );
 
 -- order is a reserved keyword; quote when using
-create table "order"
+CREATE TABLE "order"
 (
-    order_num     integer not null,
+    order_num     INTEGER GENERATED ALWAYS AS IDENTITY ( START WITH 1000 ),
     status        order_status,
-    billing_info  varchar(30),
-    shipping_info varchar(30),
+    billing_info  VARCHAR(30),
+    shipping_info VARCHAR(30),
 
-    primary key (order_num)
+    PRIMARY KEY (order_num)
 );
 
 -- book participation is total: books must have at least one author
-create table book_author
+CREATE TABLE book_author
 (
-    book_id   integer not null,
-    author_id integer not null,
-    primary key (book_id, author_id),
-    foreign key (book_id) references book
-        on delete cascade,
-    foreign key (author_id) references author (ID)
-        on delete cascade
+    book_id   INTEGER NOT NULL,
+    author_id INTEGER NOT NULL,
+    PRIMARY KEY (book_id, author_id),
+    FOREIGN KEY (book_id) REFERENCES book
+        ON DELETE CASCADE,
+    FOREIGN KEY (author_id) REFERENCES author (id)
+        ON DELETE CASCADE
 );
 
 -- book participation is total: must have at least one genre
-create table book_genre
+CREATE TABLE book_genre
 (
-    book_id    integer     not null,
-    genre_name varchar(15) not null,
-    primary key (book_id, genre_name),
-    foreign key (book_id) references book
-        on delete no action,
-    foreign key (genre_name) references genre (name)
-        on delete set null
+    book_id    INTEGER     NOT NULL,
+    genre_name VARCHAR(15) NOT NULL,
+    PRIMARY KEY (book_id, genre_name),
+    FOREIGN KEY (book_id) REFERENCES book
+        ON DELETE CASCADE,
+    FOREIGN KEY (genre_name) REFERENCES genre (name)
+        ON DELETE SET NULL
 );
 
-create table order_book
+CREATE TABLE order_book
 (
-    order_num integer,
-    book_id   integer,
-    quantity integer check (quantity >= 0),
-    primary key (order_num, book_id),
-    foreign key (order_num) references "order" (order_num)
-        on delete set null,
-    foreign key (book_id) references book (book_id)
-        on delete set null
+    order_num INTEGER,
+    book_id   INTEGER,
+    quantity  INTEGER CHECK (quantity >= 0),
+    PRIMARY KEY (order_num, book_id),
+    FOREIGN KEY (order_num) REFERENCES "order" (order_num)
+        ON DELETE CASCADE,
+    FOREIGN KEY (book_id) REFERENCES book (book_id)
+        ON DELETE CASCADE
 );
 
 -- user is a reserved keyword; quote when using
-create table "user"
+CREATE TABLE "user"
 (
-    ID       varchar(15) not null,
-    password varchar(15) not null,
-    is_owner boolean     not null,
-    primary key (ID)
+    id       VARCHAR(15) NOT NULL,
+    password VARCHAR(15) NOT NULL,
+    is_owner BOOLEAN     NOT NULL,
+    PRIMARY KEY (id)
 );
+
+CREATE VIEW publisher_profits AS
+SELECT publisher_id, name, balance
+FROM publisher JOIN publisher_banking ON publisher.banking_id = publisher_banking.id;
+
+CREATE VIEW publisher_info AS
+SELECT publisher_id,
+       publisher.name,
+       phone_number,
+       apt_number,
+       street_number,
+       street_name,
+       city,
+       province,
+       pa.postal_code
+FROM publisher
+         JOIN publisher_address pa ON publisher.address_id = pa.id
+         JOIN postal_code_location ON pa.postal_code = postal_code_location.postal_code
+         JOIN publisher_phone ON publisher_phone.id = publisher.phone_id;
 
 COMMIT;
