@@ -10,7 +10,6 @@ const pool = new Pool({
     port: 5432,
 });
 
-
 // Generates object containing all directly relevant properties of the book with targetId.
 // {id, title, authors, genres, publisher, pages, price, isbn, stock}
 async function getBookObject(targetId) {
@@ -64,6 +63,8 @@ async function getBookObject(targetId) {
     };
 }
 
+// List books by ID with relevant information; if an array is supplied,
+// only books with IDs in the array will be displayed.
 async function listBooks(bookIds = []) {
     let queryText = "SELECT * FROM book";
 
@@ -75,7 +76,6 @@ async function listBooks(bookIds = []) {
     const bookQuery = await pool
         .query(queryText)
         .catch(console.log);
-
 
     console.log("\nDisplaying books.")
     console.log("ID; Title; Authors; Genres; Publisher; Pages; ISBN; Stock")

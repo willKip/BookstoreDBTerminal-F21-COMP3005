@@ -7,6 +7,9 @@ CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 
+-- install module for fuzzy string matching
+CREATE EXTENSION fuzzystrmatch;
+
 -- rebuild database schema
 
 CREATE TYPE order_status AS ENUM ('preparing', 'delivering', 'shipped');
@@ -31,7 +34,7 @@ CREATE TABLE publisher_address
 (
     id            SERIAL,
     postal_code   VARCHAR(10) NOT NULL,
-    street_number VARCHAR(25),
+    street_number VARCHAR(10),
     street_name   VARCHAR(25),
     apt_number    VARCHAR(10),
 
@@ -154,21 +157,41 @@ CREATE TABLE "user"
 
 CREATE VIEW publisher_profits AS
 SELECT publisher_id, name, balance
-FROM publisher JOIN publisher_banking ON publisher.banking_id = publisher_banking.id;
+FROM publisher JOIN publisher_banking ON publisher.banking_id = publisher_banking.id
+ORDER BY publisher_id;
 
 CREATE VIEW publisher_info AS
-SELECT publisher_id,
-       publisher.name,
-       phone_number,
-       apt_number,
-       street_number,
-       street_name,
-       city,
-       province,
-       pa.postal_code
-FROM publisher
-         JOIN publisher_address pa ON publisher.address_id = pa.id
-         JOIN postal_code_location ON pa.postal_code = postal_code_location.postal_code
-         JOIN publisher_phone ON publisher_phone.id = publisher.phone_id;
+    SELECT publisher_id,
+           publisher.name,
+           phone_number,
+           apt_number,
+           street_number,
+           street_name,
+           city,
+           province,
+           pa.postal_code
+    FROM publisher
+             JOIN publisher_address pa ON publisher.address_id = pa.id
+             JOIN postal_code_location ON pa.postal_code = postal_code_location.postal_code
+             JOIN publisher_phone ON publisher_phone.id = publisher.phone_id
+    ORDER BY publisher_id;
+
+CREATE FUNCTION restock() RETURNS TRIGGER AS
+$restock$
+BEGIN
+    IF (new.stock  < 10) THEN
+        UPDATE book
+        SET stock = stock + 20
+        WHERE book_id = new.book_id ;
+    END IF;
+    RETURN new;
+END;
+$restock$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER book_restock
+    AFTER UPDATE
+    ON book
+    FOR EACH ROW
+EXECUTE FUNCTION restock();
 
 COMMIT;

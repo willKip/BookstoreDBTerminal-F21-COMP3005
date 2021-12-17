@@ -12,12 +12,14 @@ init();
 
 function init() {
     console.log("\n=== Welcome to the LookInnaBook Bookstore User Terminal ===");
-    login().then((loginSuccess) => {
-        if (loginSuccess) {
-            loggedin = loginSuccess
-            libraryLoop();
-        }
-    });
+    libraryLoop();
+    //
+    // login().then((loginSuccess) => {
+    //     if (loginSuccess) {
+    //         loggedin = loginSuccess
+    //         libraryLoop();
+    //     }
+    // });
 }
 
 function libraryLoop() {
@@ -135,8 +137,6 @@ async function bookMenu() {
             case "0":
                 ongoing = false;
                 break;
-            default:
-                break;
         }
     }
 }
@@ -161,6 +161,7 @@ async function checkOutMenu() {
     while (ongoing) {
         console.log("\nOptions:");
         console.log("   (1) Checkout items in basket");
+        console.log("   (2) Empty basket");
         console.log("   (0) Back to Main Menu");
 
         switch (prompt("Selection > ")) {
@@ -177,7 +178,8 @@ async function checkOutMenu() {
 
                     const newOrderNum = await db.query({
                         text: format(
-                            'INSERT INTO "order"(status, billing_info, shipping_info) VALUES (%L) RETURNING order_num',
+                            'INSERT INTO "order"(status, billing_info, shipping_info) ' +
+                            'VALUES (%L) RETURNING order_num',
                             [orderStatusArray[Math.floor(Math.random() * orderStatusArray.length)],
                                 billing,
                                 shipping]),
@@ -203,7 +205,7 @@ async function checkOutMenu() {
 
                         await db.query(format(
                             "INSERT INTO order_book(order_num, book_id, quantity) VALUES (%L)",
-                                [newOrderNum.rows[0], book.id, soldCount]
+                            [newOrderNum.rows[0], book.id, soldCount]
                         )).catch(console.log);
 
                         // Update appropriate statistics and credits money to publisher
@@ -248,6 +250,11 @@ async function checkOutMenu() {
                 } else {
                     console.log("Checkout basket is empty.");
                 }
+                break;
+            case "2":
+                checkoutBasket = {};
+                ongoing = false;
+                console.log("Basket emptied.");
                 break;
             case "0":
                 ongoing = false;
@@ -333,7 +340,7 @@ async function searchBooks() {
     if (conditionArray.length !== 0)
         queryStr += " WHERE " + conditionArray.join(" AND ");
 
-    // Search in books only to lessen load on join with genre and author tables
+    // Search in books only first to lessen load on join with genre and author tables
     const initialQuery = await db
         .query({
             text: queryStr,
@@ -389,8 +396,23 @@ async function searchBooks() {
     }
 
     await listBooks(genreQuery.rows);
-}
 
+    // Query books not listed if they have 'similar' titles
+    const similarQuery = await db
+        .query(format(
+            "SELECT book.book_id, book.title " +
+            "FROM book " +
+            "WHERE book.book_id NOT IN (%L) AND " +
+            "(SELECT levenshtein_less_equal(%L, book.title, 16)) <= 16" +
+            "ORDER BY book_id", genreQuery.rows, title))
+        .catch(console.log);
+
+    if (similarQuery.rows.length > 0) {
+        console.log(`\nBooks with similar titles to "${title}" you may be looking for:`)
+        for (const book of similarQuery.rows)
+            console.log(`Book ${book["book_id"]}, titled ${book["title"]}`);
+    }
+}
 
 // Rounds input to rounded string, to max 2 decimal places. Used for money outputs
 function formatMoney(input) {

@@ -1,0 +1,68 @@
+TODO:
+    Customer:
+        Browse books
+        Search books (with multiple attributes)
+        Select book, view info on id, author(s), genre(s), publisher, pages, price, isbn, stock
+        Add items to basket
+        Check out: insert billing and shipping info and complete order in checkout basket
+        confirm orders
+    - Owner:
+        Add new books
+        Remove books
+        - Edit books (optional)
+        View publisher info (with banking accounts)
+        View reports
+            Use SQL Views
+            - Choose from a set of predetermined reports in which they output
+              parameters to show report
+            - e.g. sales in a period of time, sales per genre, sales per author
+    Triggers: book quantity falling below certain number (10 books) means
+      new order will be placed: message shown to owner (optional),
+      increase number of books in stock by books sold in previous month
+    - Bonus features:
+        After search, suggest additional books with similar titles based on their
+        Levenshtein distance values.
+
+Grading Scheme
+
+Conceptual Design: 25%
+    Any design will be acceptable. The focus will be mostly on avoiding mistakes
+    in your design. As long as you don't mess up your design by things like
+    those discussed in class (common mistakes in ER diagrams), you should get a
+    high grade.
+
+Reduction to Relation Schemas: 15%
+    As long as you correctly reduce your ER diagram into relation schemas
+    correctly, you'll get the full grade. If you make mistakes (for example
+    creating a relation for each entity set and each relationship set regardless
+    of cardinality and participation type), you'll start losing marks.
+
+Normalization of Relation Schemas: 20%
+    You should come up with a set of functional dependencies that apply to your
+    relations. Then, you should test your relation to see whether they are in
+    good form (BCNF). If they are not, decompose into BCNF. If they are not
+    dependency-preserving, decompose into 3NF. You'll need to show the test
+    steps and decomposition steps (if decomposition is needed).
+
+Database Schema Diagram: 10%
+
+Quality of Implementation: 30%
+    Github Repository: Upload your code to a github repository. It's fine if the
+    repository is private until the latest submission date (December 17), the
+    next day, the repository must be public. Otherwise, you'll lose all marks
+    of this section.
+    Screenshots are essential to demonstrate the supported functionality. Please
+    add a screenshot for each functionality you are supporting.
+    The DBMS must be a relational DBMS. Otherwise, you're losing most of the
+    marks of this section.
+
+Above adds up to 100%
+
+Solo Bonus: 20%
+
+TARGET: 80%
+
+Bonus Features: Up to 15%
+    Features that are not in the problem statement and require non-negligible
+    efforts to implement. For example, using an out-of-the-box UI library
+    doesn't qualify as bonus.

@@ -61,7 +61,7 @@ async function mainMenu() {
         console.log("   (1) List All Books");
         console.log("   (2) Add Book");
         console.log("   (3) Remove Book");
-        console.log("   (4) View Publishers");
+        console.log("   (4) View Publisher Info");
         console.log("   (5) View Reports");
         console.log("   (0) Exit");
 
@@ -74,6 +74,12 @@ async function mainMenu() {
                 break;
             case "3":
                 await removeBook().catch(console.log);
+                break;
+            case "4":
+                await listPublishers().catch(console.log);
+                break;
+            case "5":
+                await reportsMenu().catch(console.log);
                 break;
             case "0":
                 console.log("Exiting...")
@@ -210,4 +216,109 @@ async function removeBook() {
         console.log(`Deletion failed. Book ${toRemove} is invalid or has already been deleted.`);
     else
         console.log(`Book ${toRemove} deleted.`);
+}
+
+async function listPublishers() {
+    const publisherQuery = await db
+        .query("SELECT * FROM publisher_info")
+        .catch(console.log);
+
+    console.log("\nDisplaying publishers.");
+    console.log("ID; Name; Phone #; Apartment #; Street #; Street Name; City; Province; Postal Code");
+
+    for (const publisher of publisherQuery.rows) {
+        let outputStr = "";
+        outputStr += String(publisher["publisher_id"]).padStart(2, " ");        // ID
+        outputStr += "; " + `${publisher["name"]}`.padEnd(25, " ");             // Name
+        outputStr += "; " + `${publisher["phone_number"]}`.padEnd(15, " ");     // Phone Number
+        outputStr += "; " + `${publisher["apt_number"]}`.padEnd(10, " ");       // Apt. Number
+        outputStr += "; " + `${publisher["street_number"]}`.padEnd(10, " ");    // St. Number
+        outputStr += "; " + `${publisher["street_name"]}`.padEnd(25, " ");      // St. Name
+        outputStr += "; " + `${publisher["city"]}`.padEnd(25, " ");             // City
+        outputStr += "; " + `${publisher["province"]}`.padEnd(25, " ");         // Province
+        outputStr += "; " + `${publisher["postal_code"]}`.padEnd(10, " ");      // Postal Code
+
+        console.log(outputStr);  // Print book information string
+    }
+}
+
+async function reportsMenu() {
+    let ongoing = true;
+
+    while (ongoing) {
+        console.log("\nReports Menu:");
+        console.log("   (1) Sales per Genre");
+        console.log("   (2) Sales per Author");
+        console.log("   (3) Publisher Profits");
+        console.log("   (0) Exit");
+
+        switch (prompt("Selection > ")) {
+            case "1":
+                let gemreQueryStr = "SELECT * FROM genre";
+
+                let genreParam = prompt("Genre name? (leave blank to skip) > ");
+
+                if (genreParam)
+                    gemreQueryStr += format(" WHERE name ILIKE %L", `%${genreParam}%`);
+
+                const genreQuery = await db
+                    .query(gemreQueryStr + " ORDER BY name")
+                    .catch(console.log);
+
+                if (genreQuery.rows.length === 0) {
+                    console.log("\nNo matches found.")
+                } else {
+                    console.log("\nDisplaying genres and their sales:");
+
+                    for (const genre of genreQuery.rows)
+                        console.log(`${genre["name"]}`.padEnd(15, " ") + `: ${genre["sales"]} sales`);
+                }
+                break;
+            case "2":
+                let authorQueryStr = "SELECT name, sales FROM author";
+
+                let authorParam = prompt("Author name? (leave blank to skip) > ");
+
+                if (authorParam)
+                    authorQueryStr += format(" WHERE name ILIKE %L", `%${authorParam}%`);
+
+                const authorQuery = await db
+                    .query(authorQueryStr + " ORDER BY name")
+                    .catch(console.log);
+
+                if (authorQuery.rows.length === 0) {
+                    console.log("\nNo matches found.")
+                } else {
+                    console.log("\nDisplaying authors and their sales:");
+
+                    for (const author of authorQuery.rows)
+                        console.log(`${author["name"]}`.padEnd(25, " ") + `: ${author["sales"]} sales`);
+                }
+                break;
+            case "3":
+                let publisherQueryStr = "SELECT name, balance FROM publisher_profits";
+
+                let publisherParam = prompt("Publisher name? (leave blank to skip) > ");
+
+                if (publisherParam)
+                    publisherQueryStr += format(" WHERE name ILIKE %L", `%${publisherParam}%`);
+
+                const publisherQuery = await db
+                    .query(publisherQueryStr + " ORDER BY name")
+                    .catch(console.log);
+
+                if (publisherQuery.rows.length === 0) {
+                    console.log("\nNo matches found.")
+                } else {
+                    console.log("\nDisplaying publishers and their profits:");
+
+                    for (const publisher of publisherQuery.rows)
+                        console.log(`${publisher["name"]}`.padEnd(25, " ") + `: $${publisher["balance"]}`);
+                }
+                break;
+            case "0":
+                ongoing = false;
+                break;
+        }
+    }
 }
