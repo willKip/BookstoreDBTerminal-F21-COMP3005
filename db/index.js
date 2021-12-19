@@ -1,14 +1,22 @@
 const {Pool} = require("pg");
 const format = require("pg-format");
 const prompt = require("prompt-sync")({sigint: true});
+const pgConfig = require("../pgConfig.json")
 
+// Connect to DB
 const pool = new Pool({
-    user: "postgres",
-    host: "localhost",
-    database: "lookInnaBook",
-    password: "admin",
-    port: 5432,
+    user: pgConfig.user,
+    password: pgConfig.password,
+    host: pgConfig.host,
+    port: pgConfig.port,
+    database: "lookInnaBook"
 });
+
+// Queries DB for system time, used for checking connection
+async function getDBConnectionTime() {
+    const nowQuery = await pool.query("SELECT NOW()");
+    return nowQuery.rows[0]["now"];
+}
 
 // Generates object containing all directly relevant properties of the book with targetId.
 // {id, title, authors, genres, publisher, pages, price, isbn, stock}
@@ -114,5 +122,5 @@ module.exports = {
     end: () => {
         return pool.end();
     },
-    getBookObject, listBooks, getInteger
+    getDBConnectionTime, getBookObject, listBooks, getInteger
 };

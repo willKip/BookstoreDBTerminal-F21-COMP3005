@@ -3,17 +3,61 @@
 const fs = require("fs");
 const path = require("path");
 const faker = require("faker/locale/en");
-const db = require("./index");
+const pgtools = require("pgtools");
 const format = require("pg-format");
+const pgConfig = require("../pgConfig.json");
+let db;
 
 const initDBSQL = fs.readFileSync(path.join(__dirname, "./initDB.sql"), "utf-8");
 
+run().then().catch(console.log);
 
-function initDB() {
+async function run() {
+    console.log("Initializing lookInnaBook DB...");
+    faker.seed(3005);   // Seed guarantees consistent example data creation
+
+    await initDB().catch(console.log);
+
+    await initUser().catch(console.log);
+    await initPostalCodeLocation().catch(console.log);
+    await initPublisherBanking().catch(console.log);
+    await initPublisherPhone().catch(console.log);
+    await initPublisherAddress().catch(console.log);
+    await initOrder().catch(console.log);
+    await initAuthor().catch(console.log);
+    await initGenre().catch(console.log);
+    await initPublisher().catch(console.log);
+    await initBook().catch(console.log);
+    await initOrderBook().catch(console.log);
+    await initBookAuthor().catch(console.log);
+    await initBookGenre().catch(console.log);
+
+    db.end();
+}
+
+async function createDB() {
+    await pgtools.createdb({
+        user: pgConfig.user,
+        password: pgConfig.password,
+        host: pgConfig.host,
+        port: pgConfig.port,
+    }, "lookInnaBook")
+        .catch((err) => {
+            console.log(`ERROR: ${err.name}`);
+            console.log("duplicate_database error can be ignored; the DB is already in place.")
+
+            if (err.name !== "duplicate_database")
+                process.exit(-1);
+        });
+}
+
+async function initDB() {
+    await createDB().catch(console.log);
+    db = await require("./index");
+
     return db
         .query(initDBSQL)
-        .then(() => console.log("Database schema initialized."))
-        .catch(console.log);
+        .then(() => console.log("Database schema initialized."));
 }
 
 function initUser() {
@@ -38,7 +82,7 @@ function initPublisherBanking(count = 10) {
         values.push([0]);
 
     return db
-        .query(format("insert into publisher_banking(balance) values %L returning *",
+        .query(format("INSERT INTO publisher_banking(balance) VALUES %L RETURNING *",
             values), [])
         .then((res) => console.log(`[${res.rows.length}] publisher_banking entries initialized.`))
         .catch(console.log);
@@ -51,7 +95,7 @@ function initPublisherPhone(count = 10) {
         values.push([faker.phone.phoneNumberFormat()]);
 
     return db
-        .query(format("insert into publisher_phone(phone_number) values %L returning *",
+        .query(format("INSERT INTO publisher_phone(phone_number) VALUES %L RETURNING *",
             values), [])
         .then((res) => console.log(`[${res.rows.length}] publisher_phone entries initialized.`))
         .catch(console.log);
@@ -84,7 +128,7 @@ async function initPublisherAddress(count = 15) {
     for (let i = 0; i < count; i++) {
         // Select postal code from existing, randomly
 
-        let zipCode = postalCodes.rows[faker.datatype.number(postalCodes.rows.length-1)];
+        let zipCode = postalCodes.rows[faker.datatype.number(postalCodes.rows.length - 1)];
         let streetNum = faker.datatype.number({min: 101, max: 999});
         let streetName = faker.address.streetName();
         let aptNum = faker.datatype.number({min: 101, max: 999});
@@ -117,9 +161,9 @@ async function initPublisher(count = 15) {
 
     for (let i = 0; i < count; i++) {
         // Select keys from existing, randomly
-        let bankingID = banking.rows[faker.datatype.number(banking.rows.length-1)];
-        let addressID = address.rows[faker.datatype.number(address.rows.length-1)];
-        let phoneID = phone.rows[faker.datatype.number(phone.rows.length-1)];
+        let bankingID = banking.rows[faker.datatype.number(banking.rows.length - 1)];
+        let addressID = address.rows[faker.datatype.number(address.rows.length - 1)];
+        let phoneID = phone.rows[faker.datatype.number(phone.rows.length - 1)];
         let name = faker.company.companyName().substring(0, 25);
 
         values.push([bankingID, addressID, phoneID, name]);
@@ -142,7 +186,7 @@ async function initBook(count = 20) {
 
     for (let i = 0; i < count; i++) {
         // Select keys from existing, randomly
-        let publisherID = publishers.rows[faker.datatype.number(publishers.rows.length-1)];
+        let publisherID = publishers.rows[faker.datatype.number(publishers.rows.length - 1)];
         let isbn = faker.finance.routingNumber();  // NOT a valid ISBN generator; placeholder values
         let title = `${faker.commerce.productAdjective()} ${faker.animal.dog()}`.substring(0, 30);
         let pages = faker.datatype.number({min: 80, max: 1200});
@@ -173,7 +217,7 @@ async function initOrder(count = 2) {
 
     for (let i = 0; i < count; i++) {
         // Select order status from enum, randomly
-        let orderStatus = orderStatusArray[faker.datatype.number(orderStatusArray.length-1)];
+        let orderStatus = orderStatusArray[faker.datatype.number(orderStatusArray.length - 1)];
         let billingInfo = `${faker.address.city()}, ${faker.address.state()}`.substring(0, 30);
         let shippingInfo = `${faker.address.city()}, ${faker.address.state()}`.substring(0, 30);
 
@@ -236,7 +280,7 @@ async function initOrderBook() {
         // Select key from existing, randomly
 
         let orderNum = orders.rows[i];
-        let bookId = books.rows[faker.datatype.number(books.rows.length-1)];
+        let bookId = books.rows[faker.datatype.number(books.rows.length - 1)];
         let quantity = faker.datatype.number({min: 1, max: 20});
 
         values.push([orderNum, bookId, quantity]);
@@ -266,7 +310,7 @@ async function initBookAuthor() {
     for (let i = 0; i < books.rows.length; i++) {
         // Select keys from existing, randomly
         let bookId = books.rows[i];
-        let authorId = authors.rows[faker.datatype.number(authors.rows.length-1)];
+        let authorId = authors.rows[faker.datatype.number(authors.rows.length - 1)];
 
         values.push([bookId, authorId]);
     }
@@ -295,7 +339,7 @@ async function initBookGenre() {
     for (let i = 0; i < books.rows.length; i++) {
         // Select keys from existing, randomly
         let bookId = books.rows[i];
-        let genreName = genres.rows[faker.datatype.number(genres.rows.length-1)];
+        let genreName = genres.rows[faker.datatype.number(genres.rows.length - 1)];
 
         values.push([bookId, genreName]);
     }
@@ -305,56 +349,4 @@ async function initBookGenre() {
             values), [])
         .then((res) => console.log(`[${res.rows.length}] book_genre entries initialized.`))
         .catch(console.log);
-}
-
-// TODO: better way to write this? functionalize?
-if (require.main === module) {
-    console.log("Initializing lookInnaBook DB...");
-    faker.seed(3005);   // Seed guarantees consistent example data creation
-
-    initDB().then(
-        () => initUser().catch(err => {
-            console.log("ERROR: problem with initUser(): " + err.message);
-        })
-    ).then(
-        () => initPostalCodeLocation()
-    ).then(
-        () => initPublisherBanking()
-    ).then(
-        () => initPublisherPhone()
-    ).then(
-        () => initPublisherAddress()
-    ).then(
-        () => initOrder().catch(err => {
-            console.log("ERROR: problem with initOrder(): " + err.message);
-        })
-    ).then(
-        () => initAuthor().catch(err => {
-            console.log("ERROR: problem with initAuthor(): " + err.message);
-        })
-    ).then(
-        () => initGenre().catch(err => {
-            console.log("ERROR: problem with initGenre(): " + err.message);
-        })
-    ).then(
-        () => initPublisher().catch(err => {
-            console.log("ERROR: problem with initPublisher(): " + err.message);
-        })
-    ).then(
-        () => initBook().catch(err => {
-            console.log("ERROR: problem with initBook(): " + err.message);
-        })
-    ).then(
-        () => initOrderBook().catch(err => {
-            console.log("ERROR: problem with initOrderBook(): " + err.message);
-        })
-    ).then(
-        () => initBookAuthor().catch(err => {
-            console.log("ERROR: problem with initBookAuthor(): " + err.message);
-        })
-    ).then(
-        () => initBookGenre().catch(err => {
-            console.log("ERROR: problem with initBookGenre(): " + err.message);
-        })
-    ).then(() => db.end());
 }

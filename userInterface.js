@@ -2,30 +2,35 @@
 
 const db = require("./db/index");
 const format = require("pg-format");
-const {getBookObject, listBooks, getInteger} = require("./db");
+const {getBookObject, listBooks, getInteger, getDBConnectionTime} = require("./db");
 const prompt = require("prompt-sync")({sigint: true});
 
 let checkoutBasket = {};
 let loggedin = "none";
 
-init();
+init().then();
 
-function init() {
+async function init() {
+    await getDBConnectionTime()
+        .catch((err) => {
+            console.log(err.toString());
+            console.log("Error while accessing DB... did you 'npm run dbinit' first?")
+            db.end();
+            process.exit(-1);
+        })
+        .then((res) => console.log(`Connected to lookInnaBook DB on ${res}`));
+
     console.log("\n=== Welcome to the LookInnaBook Bookstore User Terminal ===");
-    libraryLoop();
-    //
-    // login().then((loginSuccess) => {
-    //     if (loginSuccess) {
-    //         loggedin = loginSuccess
-    //         libraryLoop();
-    //     }
-    // });
+
+    login().then((loginSuccess) => {
+        if (loginSuccess) {
+            loggedin = loginSuccess
+            mainMenu().then();
+        }
+    });
 }
 
-function libraryLoop() {
-    mainMenu().then();
-}
-
+// Main menu; offers options to users
 async function mainMenu() {
     let ongoing = true;
 
@@ -66,6 +71,7 @@ async function mainMenu() {
     }
 }
 
+// Logs into the application; owner accounts will be denied access.
 async function login() {
     let loggedinId = null;
 
@@ -93,6 +99,7 @@ async function login() {
     return loggedinId;
 }
 
+// Offers several options regarding a single book.
 async function bookMenu() {
     let targetId = getInteger("Book ID? > ");
     if (!targetId) return;
@@ -141,6 +148,7 @@ async function bookMenu() {
     }
 }
 
+// Allow user to review and checkout items in the basket.
 async function checkOutMenu() {
     console.log(`\n=== Printing checkout basket of user ${loggedin} ===`);
 
@@ -265,8 +273,9 @@ async function checkOutMenu() {
     }
 }
 
+// Fetch the information for the given order number
 async function trackOrder() {
-    let targetOrder = prompt("Order Number? > ");
+    let targetOrder = getInteger("Order Number? > ");
     const orderQuery = await db
         .query(format(
             `SELECT * FROM "order" WHERE order_num = %L`, targetOrder))
@@ -316,6 +325,7 @@ async function trackOrder() {
     console.log(`Total: $${formatMoney(total)}`);
 }
 
+// Searches books with entered parameters.
 async function searchBooks() {
     let queryStr = "SELECT DISTINCT book_id FROM book";
     let conditionArray = [];
@@ -349,7 +359,23 @@ async function searchBooks() {
         .catch(console.log);
 
     if (initialQuery.rows.length === 0) {
-        console.log("No matches found.")
+        console.log("No matches found from query so far.")
+
+        // Query books not listed if they have 'similar' titles
+        const similarQuery = await db
+            .query(format(
+                "SELECT book.book_id, book.title " +
+                "FROM book " +
+                "WHERE (SELECT levenshtein_less_equal(%L, book.title, 16)) <= 16" +
+                "ORDER BY book_id", title))
+            .catch(console.log);
+
+        if (similarQuery.rows.length > 0) {
+            console.log(`\nBooks with similar titles to "${title}" you may be looking for:`)
+            for (const book of similarQuery.rows)
+                console.log(`Book ${book["book_id"]}, titled ${book["title"]}`);
+        }
+
         return;
     }
 
@@ -392,25 +418,8 @@ async function searchBooks() {
 
     if (genreQuery.rows.length === 0) {
         console.log("No matches found.")
-        return;
-    }
-
-    await listBooks(genreQuery.rows);
-
-    // Query books not listed if they have 'similar' titles
-    const similarQuery = await db
-        .query(format(
-            "SELECT book.book_id, book.title " +
-            "FROM book " +
-            "WHERE book.book_id NOT IN (%L) AND " +
-            "(SELECT levenshtein_less_equal(%L, book.title, 16)) <= 16" +
-            "ORDER BY book_id", genreQuery.rows, title))
-        .catch(console.log);
-
-    if (similarQuery.rows.length > 0) {
-        console.log(`\nBooks with similar titles to "${title}" you may be looking for:`)
-        for (const book of similarQuery.rows)
-            console.log(`Book ${book["book_id"]}, titled ${book["title"]}`);
+    } else {
+        await listBooks(genreQuery.rows);
     }
 }
 

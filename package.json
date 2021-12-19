@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "description": "Final project for COMP3005",
   "main": "userInterface.js",
-  "scripts": {},
+  "scripts": {
+    "dbinit": "node ./db/initDB.js",
+    "user": "node userInterface.js",
+    "owner": "node ownerInterface.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/willKip/BookstoreDBTerminal-F21-COMP3005.git"
@@ -17,10 +21,10 @@
     "faker": "^5.5.3",
     "pg": "^8.7.1",
     "pg-format": "^1.0.4",
+    "pgtools": "^0.3.2",
     "prompt-sync": "^4.2.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.15",
     "@types/faker": "^5.5.9"
   }
 }

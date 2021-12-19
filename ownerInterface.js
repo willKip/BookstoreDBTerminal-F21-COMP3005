@@ -2,26 +2,34 @@
 
 const db = require("./db/index");
 const format = require("pg-format");
-const {listBooks, getInteger} = require("./db");
+const {listBooks, getInteger, getDBConnectionTime} = require("./db");
 const faker = require("faker/locale/en");
 const prompt = require("prompt-sync")({sigint: true});
 
 let loggedin = "none";
 
-init();
+init().then();
 
-function init() {
+async function init() {
+    await getDBConnectionTime()
+        .catch((err) => {
+            console.log(err.toString());
+            console.log("Error while accessing DB... did you 'npm run dbinit' first?")
+            db.end();
+            process.exit(-1);
+        })
+        .then((res) => console.log(`Connected to lookInnaBook DB on ${res}`));
+
     console.log("\n=== Welcome to the LookInnaBook Bookstore Owner Terminal ===");
-    // login().then((loginSuccess) => {
-    //     if (loginSuccess) {
-    //         loggedin = loginSuccess
-    //         ownerLoop();
-    //     }
-    // });
-
-    ownerLoop();
+    login().then((loginSuccess) => {
+        if (loginSuccess) {
+            loggedin = loginSuccess
+            mainMenu().then();
+        }
+    });
 }
 
+// Logs into the application; customer accounts will be denied access.
 async function login() {
     let loggedinId = null;
 
@@ -49,10 +57,7 @@ async function login() {
     return loggedinId;
 }
 
-function ownerLoop() {
-    mainMenu().then();
-}
-
+// Main menu; offers options to users
 async function mainMenu() {
     let ongoing = true;
 
@@ -93,6 +98,7 @@ async function mainMenu() {
     }
 }
 
+// Allows user to create a new book to add to the DB.
 async function addBook() {
     const publishers = await db.query({
         rowMode: "array", text: "SELECT publisher_id FROM publisher"
@@ -203,6 +209,7 @@ async function addBook() {
     console.log(`Book "${bookInsert.rows[0].title}" added.`);
 }
 
+// Allows removal of a book with the given ID.
 async function removeBook() {
     let toRemove = getInteger("ID of book to remove > ");
     if (!toRemove) return;
@@ -218,22 +225,24 @@ async function removeBook() {
         console.log(`Book ${toRemove} deleted.`);
 }
 
+// Lists information of all publishers
 async function listPublishers() {
     const publisherQuery = await db
         .query("SELECT * FROM publisher_info")
         .catch(console.log);
 
     console.log("\nDisplaying publishers.");
-    console.log("ID; Name; Phone #; Apartment #; Street #; Street Name; City; Province; Postal Code");
+    console.log("ID; Name; Banking Account ID; Phone #; Apartment #; Street #; Street Name; City; Province; Postal Code");
 
     for (const publisher of publisherQuery.rows) {
         let outputStr = "";
         outputStr += String(publisher["publisher_id"]).padStart(2, " ");        // ID
         outputStr += "; " + `${publisher["name"]}`.padEnd(25, " ");             // Name
+        outputStr += "; " + `${publisher["banking_id"]}`.padStart(2, " ");      // Banking
         outputStr += "; " + `${publisher["phone_number"]}`.padEnd(15, " ");     // Phone Number
         outputStr += "; " + `${publisher["apt_number"]}`.padEnd(10, " ");       // Apt. Number
         outputStr += "; " + `${publisher["street_number"]}`.padEnd(10, " ");    // St. Number
-        outputStr += "; " + `${publisher["street_name"]}`.padEnd(25, " ");      // St. Name
+        outputStr += "\n  ; " + `${publisher["street_name"]}`.padEnd(25, " ");      // St. Name
         outputStr += "; " + `${publisher["city"]}`.padEnd(25, " ");             // City
         outputStr += "; " + `${publisher["province"]}`.padEnd(25, " ");         // Province
         outputStr += "; " + `${publisher["postal_code"]}`.padEnd(10, " ");      // Postal Code
@@ -242,6 +251,7 @@ async function listPublishers() {
     }
 }
 
+// Offers menu to access all reports
 async function reportsMenu() {
     let ongoing = true;
 
@@ -254,15 +264,15 @@ async function reportsMenu() {
 
         switch (prompt("Selection > ")) {
             case "1":
-                let gemreQueryStr = "SELECT * FROM genre";
+                let genreQueryStr = "SELECT * FROM genre";
 
                 let genreParam = prompt("Genre name? (leave blank to skip) > ");
 
                 if (genreParam)
-                    gemreQueryStr += format(" WHERE name ILIKE %L", `%${genreParam}%`);
+                    genreQueryStr += format(" WHERE name ILIKE %L", `%${genreParam}%`);
 
                 const genreQuery = await db
-                    .query(gemreQueryStr + " ORDER BY name")
+                    .query(genreQueryStr + " ORDER BY name")
                     .catch(console.log);
 
                 if (genreQuery.rows.length === 0) {
