@@ -6,17 +6,17 @@ A command line application written in JavaScript, capable of populating a Postgr
 
 ## Table of Contents
 
-- [Installation](##Installation)
-  - [You’ll Need:](###You’ll Need:)
-  - [Node Dependencies](###Node Dependencies)
-  - [How To Use](###How To Use)
+- [Installation](##installation)
+  - [You’ll Need:](###you’ll-need:)
+  - [Node Dependencies](###node-dependencies)
+  - [How To Use](###how-to-use)
 
-- [Features and Testing](##Features and Testing)
-  - [General](###General)
-  - [User (Customer) Terminal](###User (Customer) Terminal)
-  - [Owner Terminal](###Owner Terminal)
+- [Features and Testing](##features-and-testing)
+  - [General](###general)
+  - [User (Customer) Terminal](###user-\(customer\)-terminal)
+  - [Owner Terminal](###owner-terminal)
 
-- [Design Decisions](##Design Decisions)
+- [Design Decisions](##design-decisions)
 
 ## Installation
 
