@@ -6,21 +6,21 @@ A command line application written in JavaScript, capable of populating a Postgr
 
 ## Table of Contents
 
-- [Installation](##installation)
-  - [You’ll Need:](###you’ll-need:)
-  - [Node Dependencies](###node-dependencies)
-  - [How To Use](###how-to-use)
+- [Installation](#installation)
+  - [You’ll Need](#you’ll-need)
+  - [Node Dependencies](#node-dependencies)
+  - [How To Use](#how-to-use)
 
-- [Features and Testing](##features-and-testing)
-  - [General](###general)
-  - [User (Customer) Terminal](###user-\(customer\)-terminal)
-  - [Owner Terminal](###owner-terminal)
+- [Features and Testing](#features-and-testing)
+  - [General](#general)
+  - [User (Customer) Terminal](#user-(customer)-terminal)
+  - [Owner Terminal](#owner-terminal)
 
-- [Design Decisions](##design-decisions)
+- [Design Decisions](#design-decisions)
 
 ## Installation
 
-### You’ll Need:
+### You’ll Need
 
 - [Git](https://git-scm.com/)
 - [PostgreSQL 13.4](https://www.postgresql.org/) or higher; must supply username and password.
