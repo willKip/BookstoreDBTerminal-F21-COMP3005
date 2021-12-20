@@ -23,13 +23,13 @@ A command line application written in JavaScript, capable of populating a Postgr
 ### You’ll Need
 
 - [Git](https://git-scm.com/)
-- [PostgreSQL 13.4](https://www.postgresql.org/) or higher; must supply username and password.
+- [PostgreSQL 13.4](https://www.postgresql.org/) or higher
 - [npm](https://www.npmjs.com/)
 - [Node.js](https://nodejs.org/)
 
 ### Node Dependencies
 
-- [faker.js](https://www.npmjs.com/package/faker) - Fake data generator to populate DB easily
+- [faker.js](https://www.npmjs.com/package/faker) - Fake data generator to populate DB
 - [@types/faker](https://www.npmjs.com/package/@types/faker) - Type definitions for [faker.js](https://www.npmjs.com/package/faker)
 - [node-postgres](https://www.npmjs.com/package/pg) - PostgreSQL client for Node.js
 - [node-pg-format](https://www.npmjs.com/package/pg-format) - Node.js implementation of PostgreSQL `format()`, for creating injection-proof SQL queries dynamically
@@ -38,7 +38,7 @@ A command line application written in JavaScript, capable of populating a Postgr
 
 ### How To Use
 
-```powershell
+```
 # Clone repository to current directory
 git clone https://github.com/willKip/BookstoreDBTerminal-F21-COMP3005
 
