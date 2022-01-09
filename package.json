@@ -18,7 +18,7 @@
   },
   "homepage": "https://github.com/willKip/BookstoreDBTerminal-F21-COMP3005#readme",
   "dependencies": {
-    "faker": "^5.5.3",
+    "faker": "5.5.3",
     "pg": "^8.7.1",
     "pg-format": "^1.0.4",
     "pgtools": "^0.3.2",

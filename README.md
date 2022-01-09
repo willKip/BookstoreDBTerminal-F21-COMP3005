@@ -29,7 +29,7 @@ A command line application written in JavaScript, capable of populating a Postgr
 
 ### Node Dependencies
 
-- [faker.js](https://www.npmjs.com/package/faker) - Fake data generator to populate DB
+- [faker.js](https://www.npmjs.com/package/faker/v/5.5.3) - Fake data generator to populate DB. Uses version 5.5.3.
 - [@types/faker](https://www.npmjs.com/package/@types/faker) - Type definitions for [faker.js](https://www.npmjs.com/package/faker)
 - [node-postgres](https://www.npmjs.com/package/pg) - PostgreSQL client for Node.js
 - [node-pg-format](https://www.npmjs.com/package/pg-format) - Node.js implementation of PostgreSQL `format()`, for creating injection-proof SQL queries dynamically
